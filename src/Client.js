@@ -97,7 +97,7 @@ export default class Client extends Emitter {
     }
   }
 
-  onConnect() {
+  onConnect() {
     this.reconnecting = false
     this.connected = true
     this.backoff.reset()
