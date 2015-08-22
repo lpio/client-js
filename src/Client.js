@@ -15,12 +15,13 @@ export default class Client extends Emitter {
     this.options = {...options, ...Client.DEFAULTS}
     this.opened = false
     this.connected = false
+    this.reconnecting = false
     this.multiplexer = new Multiplexer(this.options.multiplex)
     this.backoff = new Backoff(this.options.backoff)
   }
 
   connect() {
-    if (this.connected) return this
+    if (this.connected || this.connecting) return this
     this.open()
     this.multiplexer.on('drain', ::this.onDrain)
     return this
@@ -59,6 +60,7 @@ export default class Client extends Emitter {
   }
 
   reopen(messages) {
+    this.reconnecting = true
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
@@ -66,7 +68,8 @@ export default class Client extends Emitter {
 
   onRequestSuccess(res) {
     this.opened = false
-    this.backoff.reset()
+    this.onConnect()
+    this.dispatchMessages(res.messages)
     res.messages.forEach(message => {
       if (message.type === 'ack') {
         this.emit(`ack:${message.id}`)
@@ -83,7 +86,22 @@ export default class Client extends Emitter {
 
   onRequestError(messages) {
     this.opened = false
+    this.onDisconnect()
     this.reopen(messages)
+  }
+
+  onDisconnect() {
+    if (!this.connected &&
+      this.backoff.attempts > this.options.disconnectedAfter) {
+      this.emit('disconnected')
+    }
+  }
+
+  onConnect() {
+    this.reconnecting = false
+    this.connected = true
+    this.backoff.reset()
+    if (!this.connected) this.emit('connected')
   }
 
   onDrain(messages) {
