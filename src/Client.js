@@ -15,15 +15,16 @@ export default class Client extends Emitter {
     this.options = {...options, ...Client.DEFAULTS}
     this.opened = false
     this.connected = false
-    this.reconnecting = false
+    this.connecting = false
     this.multiplexer = new Multiplexer(this.options.multiplex)
+    this.multiplexer.on('drain', ::this.onDrain)
     this.backoff = new Backoff(this.options.backoff)
   }
 
   connect() {
     if (this.connected || this.connecting) return this
+    this.connecting = true
     this.open()
-    this.multiplexer.on('drain', ::this.onDrain)
     return this
   }
 
@@ -60,7 +61,7 @@ export default class Client extends Emitter {
   }
 
   reopen(messages) {
-    this.reconnecting = true
+    this.connecting = true
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
@@ -69,19 +70,21 @@ export default class Client extends Emitter {
   onRequestSuccess(res) {
     this.opened = false
     this.onConnect()
-    this.dispatchMessages(res.messages)
-    res.messages.forEach(message => {
-      if (message.type === 'ack') {
-        this.emit(`ack:${message.id}`)
-      }
-      else {
-        this.multiplexer.add({
-          type: 'ack',
-          id: message.id
-        })
-        this.emit('message', message)
-      }
+    res.messages.forEach(::this.onMessage)
+  }
+
+  onMessage(message) {
+    if (message.type === 'ack') {
+      this.emit(`ack:${message.id}`)
+      return
+    }
+
+    // We got a user message, lets schedule an confirmation.
+    this.multiplexer.add({
+      type: 'ack',
+      id: message.id
     })
+    this.emit('message', message)
   }
 
   onRequestError(messages) {
@@ -98,7 +101,7 @@ export default class Client extends Emitter {
   }
 
   onConnect() {
-    this.reconnecting = false
+    this.connecting = false
     this.connected = true
     this.backoff.reset()
     if (!this.connected) this.emit('connected')
