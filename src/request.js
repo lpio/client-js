@@ -21,7 +21,7 @@ export default function request(options) {
   xhr.send(JSON.stringify(options.data))
 
   return {
-    abort: () => {
+    abort: () => {
       aborted = true
       xhr.abort()
     }

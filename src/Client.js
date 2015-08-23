@@ -28,7 +28,13 @@ export default class Client extends Emitter {
     return this
   }
 
-  send(message, callback) {
+  send(recipients, data, callback) {
+    let message = {
+      id: Math.round(Math.random() * Date.now()),
+      type: 'user',
+      recipients,
+      data
+    }
     this.multiplexer.add(message)
     this.once(`ack:${message.id}`, callback)
     return this
