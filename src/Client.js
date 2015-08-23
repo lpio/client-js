@@ -62,7 +62,7 @@ export default class Client extends Emitter {
     }, this.backoff.duration())
   }
 
-  onRequestComplete() {
+  onRequestComplete() {
     this.loading = false
   }
 
