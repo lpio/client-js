@@ -29,11 +29,11 @@ export default class Client extends Emitter {
     return this
   }
 
-  send(recipients, data, callback) {
+  send(recipient, data, callback) {
     let message = {
       id: this.options.uid(),
       type: 'user',
-      recipients,
+      recipient,
       data
     }
     this.multiplexer.add(message)
