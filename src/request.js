@@ -4,14 +4,11 @@
 export default function request(options) {
   let xhr
 
-  if (window.XMLHttpRequest) {
-    xhr = new XMLHttpRequest()
-  } else {
-    xhr = new ActiveXObject('Microsoft.XMLHTTP')
-  }
+  if (window.XMLHttpRequest) xhr = new window.XMLHttpRequest()
+  else xhr = new window.ActiveXObject('Microsoft.XMLHTTP')
 
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== this.DONE) return
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState !== 4) return
     options.complete()
     if (xhr.status === 200) options.success(JSON.parse(xhr.responseText))
     else options.error(xhr)
@@ -21,6 +18,4 @@ export default function request(options) {
   xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
   xhr.setRequestHeader('Accept', 'application/json')
   xhr.send(JSON.stringify(options.data))
-
-  return xhr
 }

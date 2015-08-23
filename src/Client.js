@@ -15,17 +15,15 @@ export default class Client extends Emitter {
 
   constructor(options) {
     this.options = {...options, ...Client.DEFAULTS}
-    this.opened = false
+    this.loading = false
     this.connected = false
-    this.connecting = false
     this.multiplexer = new Multiplexer(this.options.multiplex)
     this.multiplexer.on('drain', ::this.onDrain)
     this.backoff = new Backoff(this.options.backoff)
   }
 
   connect() {
-    if (this.connected || this.connecting) return this
-    this.connecting = true
+    if (this.connected || this.loading) return this
     this.open()
     return this
   }
@@ -37,14 +35,14 @@ export default class Client extends Emitter {
   }
 
   open(messages) {
-    if (this.opened) {
-      // Never loose messages, even if right now this situation is not possible,
-      // its better to schedule them always.
+    if (this.loading) {
+      // Never loose messages, even if right now this situation should
+      // not possible, its better to handle them always.
       this.multiplexer.add(messages)
       return
     }
 
-    this.opened = true
+    this.loading = true
 
     request({
       url: this.options.url,
@@ -59,19 +57,31 @@ export default class Client extends Emitter {
   }
 
   reopen(messages) {
-    this.connecting = true
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
   }
 
   onRequestComplete() {
-    this.opened = false
+    this.loading = false
   }
 
   onRequestSuccess(res) {
-    this.onConnect()
+    this.backoff.reset()
+    if (!this.connected) {
+      this.connected = true
+      this.emit('connected')
+    }
     res.messages.forEach(::this.onMessage)
+  }
+
+  onRequestError(messages) {
+    if (this.connected &&
+      this.backoff.attempts > this.options.disconnectedAfter) {
+      this.connected = false
+      this.emit('disconnected')
+    }
+    this.reopen(messages)
   }
 
   onMessage(message) {
@@ -86,25 +96,6 @@ export default class Client extends Emitter {
       id: message.id
     })
     this.emit('message', message)
-  }
-
-  onRequestError(messages) {
-    this.onDisconnect()
-    this.reopen(messages)
-  }
-
-  onDisconnect() {
-    if (!this.connected &&
-      this.backoff.attempts > this.options.disconnectedAfter) {
-      this.emit('disconnected')
-    }
-  }
-
-  onConnect() {
-    this.connecting = false
-    this.connected = true
-    this.backoff.reset()
-    if (!this.connected) this.emit('connected')
   }
 
   onDrain(messages) {
