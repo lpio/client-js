@@ -33,6 +33,7 @@ export default class Client extends Emitter {
     let message = {
       id: this.options.uid(),
       type: 'user',
+      sender: this.id,
       recipient,
       data
     }
