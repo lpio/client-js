@@ -1,11 +1,13 @@
 import Emitter from 'emitter-component'
-import Multiplexer from './Multiplexer'
 import Backoff from 'backo'
+
+import Multiplexer from './Multiplexer'
+import request from './request'
 
 export default class Client extends Emitter {
   static DEFAULTS = {
     id: undefined,
-    uri: '/lpio',
+    url: '/lpio',
     disconnectedAfter: 5,
     multiplex: undefined,
     backoff: undefined
@@ -45,16 +47,12 @@ export default class Client extends Emitter {
     this.opened = true
 
     request({
-      uri: this.options.uri,
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json;charset=UTF-8'
-      },
-      method: 'POST',
+      url: this.options.url,
       data: {
         client: this.options.id,
         messages: messages
       },
+      complete: ::this.onRequestComplete,
       success: ::this.onRequestSuccess,
       error: this.onRequestError.bind(this, messages)
     })
@@ -67,8 +65,11 @@ export default class Client extends Emitter {
     }, this.backoff.duration())
   }
 
-  onRequestSuccess(res) {
+  onRequestComplete() {
     this.opened = false
+  }
+
+  onRequestSuccess(res) {
     this.onConnect()
     res.messages.forEach(::this.onMessage)
   }
@@ -88,7 +89,6 @@ export default class Client extends Emitter {
   }
 
   onRequestError(messages) {
-    this.opened = false
     this.onDisconnect()
     this.reopen(messages)
   }
