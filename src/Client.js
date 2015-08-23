@@ -14,6 +14,7 @@ export default class Client extends Emitter {
   }
 
   constructor(options) {
+    super()
     this.options = {...options, ...Client.DEFAULTS}
     this.loading = false
     this.connected = false
