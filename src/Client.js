@@ -10,7 +10,8 @@ export default class Client extends Emitter {
     url: '/lpio',
     disconnectedAfter: 5,
     multiplex: undefined,
-    backoff: undefined
+    backoff: undefined,
+    uid: uid
   }
 
   constructor(options) {
@@ -30,7 +31,7 @@ export default class Client extends Emitter {
 
   send(recipients, data, callback) {
     let message = {
-      id: Math.round(Math.random() * Date.now()),
+      id: this.options.uid(),
       type: 'user',
       recipients,
       data
@@ -106,4 +107,8 @@ export default class Client extends Emitter {
     this.request.abort()
     this.open(messages)
   }
+}
+
+function uid() {
+  return Math.round(Math.random() * Date.now())
 }
