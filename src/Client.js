@@ -16,7 +16,6 @@ export default class Client extends Emitter {
   constructor(options) {
     super()
     this.options = {...options, ...Client.DEFAULTS}
-    this.loading = false
     this.connected = false
     this.multiplexer = new Multiplexer(this.options.multiplex)
     this.multiplexer.on('drain', ::this.onDrain)
@@ -24,7 +23,7 @@ export default class Client extends Emitter {
   }
 
   connect() {
-    if (this.connected || this.loading) return this
+    if (this.connected || this.request) return this
     this.open()
     return this
   }
@@ -36,24 +35,22 @@ export default class Client extends Emitter {
   }
 
   open(messages) {
-    if (this.loading) {
+    if (this.request) {
       // Never loose messages, even if right now this situation should
       // not possible, its better to handle them always.
       this.multiplexer.add(messages)
       return
     }
 
-    this.loading = true
-
-    request({
+    this.request = request({
       url: this.options.url,
       data: {
         client: this.options.id,
         messages: messages
       },
-      complete: ::this.onRequestComplete,
       success: ::this.onRequestSuccess,
-      error: this.onRequestError.bind(this, messages)
+      error: this.onRequestError.bind(this, messages),
+      close: ::this.onRequestClose
     })
   }
 
@@ -63,8 +60,8 @@ export default class Client extends Emitter {
     }, this.backoff.duration())
   }
 
-  onRequestComplete() {
-    this.loading = false
+  onRequestClose() {
+    this.request = undefined
   }
 
   onRequestSuccess(res) {
@@ -100,6 +97,7 @@ export default class Client extends Emitter {
   }
 
   onDrain(messages) {
+    this.request.abort()
     this.open(messages)
   }
 }

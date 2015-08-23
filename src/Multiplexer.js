@@ -64,6 +64,7 @@ export default class Multiplexer extends Emitter {
    */
   onDrain() {
     let {buffer} = this
+    if (!buffer.length) return
     this.reset()
     this.emit('drain', buffer)
   }
