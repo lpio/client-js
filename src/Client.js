@@ -11,7 +11,6 @@ export default class Client extends Emitter {
     disconnectedAfter: 5,
     multiplex: undefined,
     backoff: undefined,
-    getMessageId: uid,
     ackTimeout: 10000
   }
 
@@ -30,15 +29,22 @@ export default class Client extends Emitter {
     return this
   }
 
-  send(recipient, data, callback) {
+  send(options, callback) {
+    let err
+
+    if (!options.data) err = new Error('Data is undefined.')
+    if (!options.recipient) err = new Error('Recipient is undefined.')
+
+    if (err) return setTimeout(callback.bind(null, err))
+
     let message = {
+      id: uid(),
       type: 'user',
-      id: this.options.getMessageId(),
       client: this.id,
       sender: this.options.user,
-      recipient,
-      data
+      ...options
     }
+
     this.multiplexer.add(message)
 
     if (callback) {
@@ -126,5 +132,5 @@ export default class Client extends Emitter {
 }
 
 function uid() {
-  return Math.round(Math.random() * Date.now())
+  return String(Math.round(Math.random() * Date.now()))
 }
