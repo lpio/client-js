@@ -11,7 +11,8 @@ export default class Client extends Emitter {
     disconnectedAfter: 5,
     multiplex: undefined,
     backoff: undefined,
-    uid: uid
+    getMessageId: uid,
+    ackTimeout: 10000
   }
 
   constructor(options) {
@@ -31,14 +32,26 @@ export default class Client extends Emitter {
 
   send(recipient, data, callback) {
     let message = {
-      id: this.options.uid(),
       type: 'user',
-      sender: this.id,
+      id: this.options.getMessageId(),
+      client: this.id,
+      sender: this.options.user,
       recipient,
       data
     }
     this.multiplexer.add(message)
-    this.once(`ack:${message.id}`, callback)
+
+    if (callback) {
+      let timeout = setTimeout(() => {
+        this.off(`ack:${message.id}`, callback)
+        callback(new Error('Delivery timeout.'))
+      }, this.options.ackTimeout)
+
+      this.once(`ack:${message.id}`, () => {
+        clearTimeout(timeout)
+        callback()
+      })
+    }
     return this
   }
 
@@ -99,7 +112,9 @@ export default class Client extends Emitter {
     // We got a user message, lets schedule an confirmation.
     this.multiplexer.add({
       type: 'ack',
-      id: message.id
+      id: message.id,
+      client: this.id,
+      sender: this.options.user
     })
     this.emit('message', message)
   }
