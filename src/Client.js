@@ -20,13 +20,12 @@ export default class Client extends Emitter {
     this.options = { ...Client.DEFAULTS, ...options}
     this.connected = false
     this.destroyed = false
-    this.multiplexer = new Multiplexer(this.options.multiplex)
-    this.multiplexer.on('drain', ::this.onDrain)
     this.backoff = new Backoff(this.options.backoff)
   }
 
   connect() {
     if (this.connected || this.loading) return this
+
     let err
     if (!this.options.id) err = new Error('Client id is undefined.')
     if (!this.options.user) err = new Error('User is undefined.')
@@ -34,24 +33,26 @@ export default class Client extends Emitter {
       this.emit('error', err)
       return this
     }
+
+    this.multiplexer = new Multiplexer(this.options.multiplex)
+    this.multiplexer.on('drain', ::this.onDrain)
     this.open()
     return this
   }
 
-  destroy() {
-    this.destroyed = true
+  disconnect() {
+    this.connected = false
     this.multiplexer.destroy()
     if (this.request) this.request.abort()
-    return this
   }
 
   send(options, callback) {
-    let err
-
-    if (!options.data) err = new Error('Data is undefined.')
-    if (!options.recipient) err = new Error('Recipient is undefined.')
-
-    if (err) return setTimeout(callback.bind(null, err))
+    if (options.type !== 'user') {
+      let err
+      if (!options.data) err = new Error('Data is undefined.')
+      if (!options.recipient) err = new Error('Recipient is undefined.')
+      if (err) return setTimeout(callback.bind(null, err))
+    }
 
     let message = {
       id: String(uid()),
