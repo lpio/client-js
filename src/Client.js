@@ -19,7 +19,6 @@ export default class Client extends Emitter {
     super()
     this.options = { ...Client.DEFAULTS, ...options}
     this.connected = false
-    this.destroyed = false
     this.backoff = new Backoff(this.options.backoff)
   }
 
@@ -80,7 +79,7 @@ export default class Client extends Emitter {
   }
 
   open(messages = []) {
-    if ((this.loading && messages.length) || this.destroyed) {
+    if ((this.loading && messages.length) || !this.connected) {
       // Never loose messages, even if right now this situation should
       // not possible, its better to handle them always.
       this.multiplexer.add(messages)
