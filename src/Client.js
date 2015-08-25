@@ -24,7 +24,7 @@ export default class Client extends Emitter {
   }
 
   connect() {
-    if (this.connected || this.request) return this
+    if (this.connected || this.loading) return this
     this.open()
     return this
   }
@@ -63,12 +63,14 @@ export default class Client extends Emitter {
   }
 
   open(messages = []) {
-    if (this.request && messages.length) {
+    if (this.loading && messages.length) {
       // Never loose messages, even if right now this situation should
       // not possible, its better to handle them always.
       this.multiplexer.add(messages)
       return
     }
+
+    this.loading = true
 
     this.request = request({
       url: this.options.url,
@@ -90,6 +92,7 @@ export default class Client extends Emitter {
 
   onRequestClose() {
     this.request = undefined
+    this.loading = false
   }
 
   onRequestSuccess(res) {
@@ -128,7 +131,7 @@ export default class Client extends Emitter {
   }
 
   onDrain(messages) {
-    this.request.abort()
+    if (this.request) this.request.abort()
     this.open(messages)
   }
 }
