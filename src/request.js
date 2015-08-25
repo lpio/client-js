@@ -16,6 +16,7 @@ export default function request(options) {
   }
 
   xhr.onerror = (err) => {
+    if (closed) return
     closed = true
     options.error(err)
   }
