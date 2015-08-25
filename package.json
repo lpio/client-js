@@ -1,8 +1,8 @@
 {
-  "name": "lpio-client-web",
+  "name": "lpio-client-js",
   "version": "0.1.0",
   "description": "Http long polling client.",
-  "repository": "https://github.com/lpio/client-web.git",
+  "repository": "https://github.com/lpio/client-js.git",
   "main": "./lib/Client.js",
   "dependencies": {
     "backo": "^1.1.0",
