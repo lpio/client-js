@@ -5,6 +5,8 @@ import uid from 'get-uid'
 
 import request from './request'
 
+let noop = () => {}
+
 export default class Client extends Emitter {
   static DEFAULTS = {
     id: undefined,
@@ -12,7 +14,8 @@ export default class Client extends Emitter {
     disconnectedAfter: 5,
     multiplex: undefined,
     backoff: undefined,
-    ackTimeout: 10000
+    ackTimeout: 10000,
+    pingInterval: 25000
   }
 
   constructor(options) {
@@ -21,6 +24,7 @@ export default class Client extends Emitter {
     this.connected = false
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
+    this.multiplexer = new Multiplexer(this.options.multiplex)
   }
 
   connect() {
@@ -34,9 +38,10 @@ export default class Client extends Emitter {
       return this
     }
     this.disabled = false
-    this.multiplexer = new Multiplexer(this.options.multiplex)
     this.multiplexer.on('drain', ::this.onDrain)
     this.open()
+    this.ping()
+
     return this
   }
 
@@ -44,13 +49,14 @@ export default class Client extends Emitter {
     let {connected} = this
     this.disabled = true
     this.connected = false
-    this.multiplexer.destroy()
+    this.multiplexer.off('drain')
+    clearInterval(this.pingIntervalId)
     if (this.request) this.request.abort()
     if (connected) this.emit('disconnected')
   }
 
-  send(options, callback) {
-    if (options.type !== 'user') {
+  send(options, callback = noop) {
+    if (options.type === 'user') {
       let err
       if (!options.data) err = new Error('Data is undefined.')
       if (!options.recipient) err = new Error('Recipient is undefined.')
@@ -109,6 +115,21 @@ export default class Client extends Emitter {
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
+  }
+
+  ping() {
+    let last = Date.now()
+    let {pingInterval} = this.options
+
+    this.pingIntervalId = setInterval(() => {
+      if (Date.now() - last > pingInterval) {
+        this.send({type: 'ping'})
+      }
+    }, pingInterval)
+
+    this.on('message', () => {
+      last = Date.now()
+    })
   }
 
   onRequestClose() {
