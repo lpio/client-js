@@ -19,6 +19,7 @@ export default class Client extends Emitter {
     super()
     this.options = { ...Client.DEFAULTS, ...options}
     this.connected = false
+    this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
   }
 
@@ -33,6 +34,7 @@ export default class Client extends Emitter {
       return this
     }
 
+    this.disabled = false
     this.multiplexer = new Multiplexer(this.options.multiplex)
     this.multiplexer.on('drain', ::this.onDrain)
     this.open()
@@ -40,6 +42,7 @@ export default class Client extends Emitter {
   }
 
   disconnect() {
+    this.disabled = true
     this.connected = false
     this.multiplexer.destroy()
     if (this.request) this.request.abort()
@@ -79,7 +82,7 @@ export default class Client extends Emitter {
   }
 
   open(messages = []) {
-    if ((this.loading && messages.length) || !this.connected) {
+    if ((this.loading && messages.length) || this.disabled) {
       // Never loose messages, even if right now this situation should
       // not possible, its better to handle them always.
       this.multiplexer.add(messages)
