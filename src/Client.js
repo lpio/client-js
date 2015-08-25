@@ -1,7 +1,7 @@
 import Emitter from 'emitter-component'
 import Backoff from 'backo'
+import Multiplexer from 'lpio-multiplexer-js'
 
-import Multiplexer from './Multiplexer'
 import request from './request'
 
 export default class Client extends Emitter {

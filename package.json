@@ -6,7 +6,8 @@
   "main": "./lib/Client.js",
   "dependencies": {
     "backo": "^1.1.0",
-    "emitter-component": "^1.1.1"
+    "emitter-component": "^1.1.1",
+    "lpio-multiplexer-js": "^0.1.0"
   },
   "devDependencies": {
     "eslint": "^0.24.1",
