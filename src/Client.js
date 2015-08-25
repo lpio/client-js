@@ -48,15 +48,16 @@ export default class Client extends Emitter {
     this.multiplexer.add(message)
 
     if (callback) {
-      let timeout = setTimeout(() => {
-        this.off(`ack:${message.id}`, callback)
-        callback(new Error('Delivery timeout.'))
-      }, this.options.ackTimeout)
-
-      this.once(`ack:${message.id}`, () => {
+      let timeout
+      let onAck = () => {
         clearTimeout(timeout)
         callback()
-      })
+      }
+      this.once(`ack:${message.id}`, onAck)
+      timeout = setTimeout(() => {
+        this.off(`ack:${message.id}`, onAck)
+        callback(new Error('Delivery timeout.'))
+      }, this.options.ackTimeout)
     }
     return this
   }
