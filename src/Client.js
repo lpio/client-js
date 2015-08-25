@@ -158,10 +158,14 @@ export default class Client extends Emitter {
   }
 
   onMessage(message) {
+    this.emit('message', message)
+
     if (message.type === 'ack') {
       this.emit(`ack:${message.id}`, message)
       return
     }
+
+    this.emit('data', message.data)
 
     // We got a user message, lets schedule an confirmation.
     this.multiplexer.add({
@@ -171,8 +175,6 @@ export default class Client extends Emitter {
       sender: this.options.user,
       recipient: 'server'
     })
-    this.emit('message', message)
-    this.emit('data', message.data)
   }
 
   onDrain(messages) {
