@@ -7,6 +7,7 @@
   "dependencies": {
     "backo": "^1.1.0",
     "emitter-component": "^1.1.1",
+    "get-uid": "^1.0.1",
     "lpio-multiplexer-js": "^0.1.0"
   },
   "devDependencies": {

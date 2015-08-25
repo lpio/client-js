@@ -1,6 +1,7 @@
 import Emitter from 'emitter-component'
 import Backoff from 'backo'
 import Multiplexer from 'lpio-multiplexer-js'
+import uid from 'get-uid'
 
 import request from './request'
 
@@ -53,7 +54,7 @@ export default class Client extends Emitter {
     if (err) return setTimeout(callback.bind(null, err))
 
     let message = {
-      id: uid(),
+      id: String(uid()),
       type: 'user',
       client: this.options.id,
       sender: this.options.user,
@@ -153,8 +154,4 @@ export default class Client extends Emitter {
     if (this.request) this.request.abort()
     this.open(messages)
   }
-}
-
-function uid() {
-  return String(Math.round(Math.random() * Date.now()))
 }
