@@ -3,16 +3,21 @@
  */
 export default function request(options) {
   let xhr
-  let aborted
+  let closed = false
 
   if (window.XMLHttpRequest) xhr = new window.XMLHttpRequest()
   else xhr = new window.ActiveXObject('Microsoft.XMLHTTP')
 
   xhr.onreadystatechange = () => {
-    if (xhr.readyState !== 4) return
+    if (xhr.readyState !== 4 || closed) return
     options.close()
     if (xhr.status === 200) options.success(JSON.parse(xhr.responseText))
-    else if (!aborted) options.error(xhr)
+    else options.error(new Error(xhr.responseText))
+  }
+
+  xhr.onerror = (err) => {
+    closed = true
+    options.error(err)
   }
 
   xhr.open('POST', options.url, true)
@@ -22,8 +27,9 @@ export default function request(options) {
 
   return {
     abort: () => {
-      aborted = true
+      closed = true
       xhr.abort()
+      options.close()
     }
   }
 }

@@ -25,6 +25,13 @@ export default class Client extends Emitter {
 
   connect() {
     if (this.connected || this.loading) return this
+    let err
+    if (!this.options.id) err = new Error('Client id is undefined.')
+    if (!this.options.user) err = new Error('User is undefined.')
+    if (err) {
+      this.emit('error', err)
+      return this
+    }
     this.open()
     return this
   }
@@ -40,7 +47,7 @@ export default class Client extends Emitter {
     let message = {
       id: uid(),
       type: 'user',
-      client: this.id,
+      client: this.options.id,
       sender: this.options.user,
       ...options
     }
@@ -76,7 +83,8 @@ export default class Client extends Emitter {
       url: this.options.url,
       data: {
         client: this.options.id,
-        messages: messages
+        user: this.options.user,
+        messages
       },
       success: ::this.onRequestSuccess,
       error: this.onRequestError.bind(this, messages),
@@ -104,8 +112,8 @@ export default class Client extends Emitter {
     res.messages.forEach(::this.onMessage)
   }
 
-  onRequestError(messages, xhr) {
-    this.emit('error', new Error(xhr.responseText))
+  onRequestError(messages, err) {
+    this.emit('error', err)
     if (this.connected &&
       this.backoff.attempts > this.options.disconnectedAfter) {
       this.connected = false
@@ -116,7 +124,7 @@ export default class Client extends Emitter {
 
   onMessage(message) {
     if (message.type === 'ack') {
-      this.emit(`ack:${message.id}`)
+      this.emit(`ack:${message.id}`, message)
       return
     }
 
@@ -124,10 +132,12 @@ export default class Client extends Emitter {
     this.multiplexer.add({
       type: 'ack',
       id: message.id,
-      client: this.id,
-      sender: this.options.user
+      client: this.options.id,
+      sender: this.options.user,
+      recipient: 'server'
     })
     this.emit('message', message)
+    this.emit('data', message.data)
   }
 
   onDrain(messages) {
