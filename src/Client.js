@@ -25,6 +25,7 @@ export default class Client extends Emitter {
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
     this.multiplexer = new Multiplexer(this.options.multiplex)
+    ping(this, this.options.pingInterval)
   }
 
   connect() {
@@ -40,7 +41,6 @@ export default class Client extends Emitter {
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
     this.open()
-    this.ping()
 
     return this
   }
@@ -50,7 +50,6 @@ export default class Client extends Emitter {
     this.disabled = true
     this.connected = false
     this.multiplexer.off('drain')
-    clearInterval(this.pingIntervalId)
     if (this.request) this.request.abort()
     if (connected) this.emit('disconnected')
   }
@@ -115,21 +114,6 @@ export default class Client extends Emitter {
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
-  }
-
-  ping() {
-    let last = Date.now()
-    let {pingInterval} = this.options
-
-    this.pingIntervalId = setInterval(() => {
-      if (Date.now() - last > pingInterval) {
-        this.send({type: 'ping'})
-      }
-    }, pingInterval)
-
-    this.on('message', () => {
-      last = Date.now()
-    })
   }
 
   onRequestClose() {
