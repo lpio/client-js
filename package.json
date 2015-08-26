@@ -1,14 +1,14 @@
 {
-  "name": "lpio-client-js",
+  "name": "lpio-client",
   "version": "0.1.0",
   "description": "Http long polling client.",
-  "repository": "https://github.com/lpio/client-js.git",
+  "repository": "https://github.com/lpio/lpio-client-js.git",
   "main": "./lib/Client.js",
   "dependencies": {
     "backo": "^1.1.0",
     "emitter-component": "^1.1.1",
     "get-uid": "^1.0.1",
-    "lpio-multiplexer-js": "^0.1.0"
+    "lpio-multiplexer": "^0.1.0"
   },
   "devDependencies": {
     "eslint": "^0.24.1",
