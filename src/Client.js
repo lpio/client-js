@@ -79,7 +79,7 @@ export default class Client {
       if (err) return setTimeout(callback.bind(null, err))
     }
 
-    let message = this.createMessage(options)
+    let message = this.buildMessage(options)
     this.multiplexer.add(message)
     if (callback) this.subscribeAck(message, callback)
     return this
@@ -90,7 +90,7 @@ export default class Client {
    *
    * @api private
    */
-  createMessage(options) {
+  buildMessage(options) {
     return {
       id: String(uid()),
       type: 'data',
@@ -167,7 +167,7 @@ export default class Client {
 
     // We need to have at least one message to get a response fast to trigger
     // "reconnected" event faster.
-    if (!messages.length) messages.push(this.createMessage({type: 'ping'}))
+    if (!messages.length) messages.push(this.buildMessage({type: 'ping'}))
 
     setTimeout(() => {
       this.reopening = false
