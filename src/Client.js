@@ -1,6 +1,6 @@
 import Emitter from 'emitter-component'
 import Backoff from 'backo'
-import Multiplexer from 'lpio-multiplexer-js'
+import Multiplexer from 'lpio-multiplexer'
 import uid from 'get-uid'
 
 import request from './request'
