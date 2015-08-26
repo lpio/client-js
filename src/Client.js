@@ -4,7 +4,6 @@ import Multiplexer from 'lpio-multiplexer-js'
 import uid from 'get-uid'
 
 import request from './request'
-import ping from './ping'
 
 let noop = () => {}
 
@@ -26,7 +25,6 @@ export default class Client extends Emitter {
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
     this.multiplexer = new Multiplexer(this.options.multiplex)
-    ping(this, this.options.pingInterval)
   }
 
   /**
@@ -47,9 +45,11 @@ export default class Client extends Emitter {
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
 
+    this.pingIntervalId = setInterval(::this.ping, this.options.pingInterval)
+
     // First thing to do is a ping request, because we can only safe for sure
     // we are connected when we got a response.
-    this.send({type: 'ping'})
+    this.ping()
 
     return this
   }
@@ -65,6 +65,7 @@ export default class Client extends Emitter {
     this.connected = false
     this.multiplexer.off('drain')
     if (this.request) this.request.abort()
+    clearInterval(this.pingIntervalId)
     if (connected) this.emit('disconnected')
   }
 
@@ -110,6 +111,15 @@ export default class Client extends Emitter {
       this.off(`ack:${message.id}`, onAck)
       callback(new Error('Delivery timeout.'))
     }, this.options.ackTimeout)
+  }
+
+  /**
+   * Send a ping message.
+   *
+   * @api private
+   */
+  ping() {
+    this.send({type: 'ping'})
   }
 
   /**
