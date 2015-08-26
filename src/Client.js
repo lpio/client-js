@@ -5,9 +5,7 @@ import uid from 'get-uid'
 
 import request from './request'
 
-let noop = () => {}
-
-export default class Client extends Emitter {
+export default class Client {
   static DEFAULTS = {
     id: undefined,
     url: '/lpio',
@@ -19,12 +17,13 @@ export default class Client extends Emitter {
   }
 
   constructor(options) {
-    super()
     this.options = { ...Client.DEFAULTS, ...options}
     this.connected = false
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
     this.multiplexer = new Multiplexer(this.options.multiplex)
+    this.out = new Emitter()
+    this.in = new Emitter()
   }
 
   /**
@@ -39,19 +38,17 @@ export default class Client extends Emitter {
     if (!this.options.id) err = new Error('Client id is undefined.')
     if (!this.options.user) err = new Error('User is undefined.')
     if (err) {
-      this.emit('error', err)
-      return this
+      setTimeout(this.onError.bind(this, err))
+      return this.out
     }
+
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
-
     this.pingIntervalId = setInterval(::this.ping, this.options.pingInterval)
-
     // First thing to do is a ping request, because we can only safe for sure
     // we are connected when we got a response.
     this.ping()
-
-    return this
+    return this.out
   }
 
   /**
@@ -66,7 +63,8 @@ export default class Client extends Emitter {
     this.multiplexer.off('drain')
     if (this.request) this.request.abort()
     clearInterval(this.pingIntervalId)
-    if (connected) this.emit('disconnected')
+    if (connected) this.out.emit('disconnected')
+    return this
   }
 
   /**
@@ -74,7 +72,7 @@ export default class Client extends Emitter {
    *
    * @api public
    */
-  send(options, callback = noop) {
+  send(options, callback) {
     if (options.type === 'user') {
       let err
       if (!options.data) err = new Error('Data is undefined.')
@@ -106,9 +104,9 @@ export default class Client extends Emitter {
       clearTimeout(timeoutId)
       callback()
     }
-    this.once(`ack:${message.id}`, onAck)
+    this.in.once(`ack:${message.id}`, onAck)
     timeoutId = setTimeout(() => {
-      this.off(`ack:${message.id}`, onAck)
+      this.in.off(`ack:${message.id}`, onAck)
       callback(new Error('Delivery timeout.'))
     }, this.options.ackTimeout)
   }
@@ -180,7 +178,7 @@ export default class Client extends Emitter {
     this.backoff.reset()
     if (!this.connected) {
       this.connected = true
-      this.emit('connected')
+      this.out.emit('connected')
     }
     res.messages.forEach(::this.onMessage)
     this.open()
@@ -192,11 +190,11 @@ export default class Client extends Emitter {
    * @api private
    */
   onRequestError(messages, err) {
-    this.emit('error', err)
+    this.out.emit('error', err)
     if (this.connected &&
       this.backoff.attempts > this.options.disconnectedAfter) {
       this.connected = false
-      this.emit('disconnected')
+      this.out.emit('disconnected')
     }
     this.reopen(messages)
   }
@@ -207,14 +205,14 @@ export default class Client extends Emitter {
    * @api private
    */
   onMessage(message) {
-    this.emit('message', message)
+    this.out.emit('message', message)
 
     if (message.type === 'ack') {
-      this.emit(`ack:${message.id}`, message)
+      this.in.emit(`ack:${message.id}`, message)
       return
     }
 
-    this.emit('data', message.data)
+    this.out.emit('data', message.data)
 
     // We got a user message, lets schedule an confirmation.
     this.multiplexer.add({
@@ -234,5 +232,14 @@ export default class Client extends Emitter {
   onDrain(messages) {
     if (this.request) this.request.abort()
     this.open(messages)
+  }
+
+  /**
+   * Emits error on out channel.
+   *
+   * @api private
+   */
+  onError(err) {
+    if (err) this.out.emit('err', err)
   }
 }
