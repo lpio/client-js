@@ -9,7 +9,6 @@ export default class Client {
   static DEFAULTS = {
     id: undefined,
     url: '/lpio',
-    disconnectedAfter: 5,
     multiplex: undefined,
     backoff: undefined,
     ackTimeout: 10000,
@@ -68,7 +67,7 @@ export default class Client {
   }
 
   /**
-   * Send a message.
+   * Schedule a message.
    *
    * @api public
    */
@@ -80,17 +79,25 @@ export default class Client {
       if (err) return setTimeout(callback.bind(null, err))
     }
 
-    let message = {
+    let message = this.createMessage(options)
+    this.multiplexer.add(message)
+    if (callback) this.subscribeAck(message, callback)
+    return this
+  }
+
+  /**
+   * Create a message.
+   *
+   * @api private
+   */
+  createMessage(options) {
+    return {
       id: String(uid()),
       type: 'data',
       client: this.options.id,
       sender: this.options.user,
       ...options
     }
-
-    this.multiplexer.add(message)
-    if (callback) this.subscribeAck(message, callback)
-    return this
   }
 
   /**
@@ -112,7 +119,7 @@ export default class Client {
   }
 
   /**
-   * Send a ping message.
+   * Schedule a ping message.
    *
    * @api private
    */
@@ -153,10 +160,24 @@ export default class Client {
    *
    * @api private
    */
-  reopen(messages) {
+  reopen(messages = []) {
+    if (this.reopening) return
+    this.reopening = true
+    let backoff = this.backoff.duration()
+
+    // We need to have at least one message to get a response fast to trigger
+    // "reconnected" event faster.
+    if (!messages.length) messages.push(this.createMessage({type: 'ping'}))
+
     setTimeout(() => {
+      this.reopening = false
       this.open(messages)
-    }, this.backoff.duration())
+    }, backoff)
+
+    if (this.connected && backoff === this.backoff.max) {
+      this.connected = false
+      this.out.emit('disconnected')
+    }
   }
 
   /**
@@ -191,11 +212,6 @@ export default class Client {
    */
   onRequestError(messages, err) {
     this.out.emit('error', err)
-    if (this.connected &&
-      this.backoff.attempts > this.options.disconnectedAfter) {
-      this.connected = false
-      this.out.emit('disconnected')
-    }
     this.reopen(messages)
   }
 
