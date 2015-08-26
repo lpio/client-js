@@ -32,7 +32,7 @@ export default class Client {
    * @api public
    */
   connect() {
-    if (this.connected || this.loading) return this
+    if (this.connected || this.loading) return this.out
 
     let err
     if (!this.options.id) err = new Error('Client id is undefined.')
@@ -45,8 +45,8 @@ export default class Client {
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
     this.pingIntervalId = setInterval(::this.ping, this.options.pingInterval)
-    // First thing to do is a ping request, because we can only safe for sure
-    // we are connected when we got a response.
+    // First thing to do is a ping request, because we can only say for sure
+    // we are "connected" when we got a response.
     this.ping()
     return this.out
   }
@@ -129,7 +129,7 @@ export default class Client {
   }
 
   /**
-   * Opens request and sends messages.
+   * Opens a request and sends messages.
    *
    * @api private
    */
@@ -203,7 +203,11 @@ export default class Client {
       this.out.emit('connected')
     }
     res.messages.forEach(::this.onMessage)
-    this.open()
+
+    // In case we have got new messages while we where busy with sending previous.
+    let messages = this.multiplexer.get()
+    this.multiplexer.reset()
+    this.open(messages)
   }
 
   /**
@@ -229,16 +233,15 @@ export default class Client {
       return
     }
 
-    this.out.emit('data', message.data)
+    if (message.data) this.out.emit('data', message.data)
 
-    // We got a user message, lets schedule an confirmation.
-    this.multiplexer.add({
+    // Lets schedule an confirmation.
+    let ack = this.buildMessage({
       type: 'ack',
       id: message.id,
-      client: this.options.id,
-      sender: this.options.user,
       recipient: 'server'
     })
+    this.multiplexer.add(ack)
   }
 
   /**
