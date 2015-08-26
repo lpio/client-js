@@ -73,7 +73,7 @@ export default class Client {
    * @api public
    */
   send(options, callback) {
-    if (options.type === 'user') {
+    if (options.type === 'data') {
       let err
       if (!options.data) err = new Error('Data is undefined.')
       if (!options.recipient) err = new Error('Recipient is undefined.')
@@ -82,7 +82,7 @@ export default class Client {
 
     let message = {
       id: String(uid()),
-      type: 'user',
+      type: 'data',
       client: this.options.id,
       sender: this.options.user,
       ...options
