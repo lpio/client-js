@@ -1,6 +1,6 @@
 {
   "name": "lpio-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Http long polling client.",
   "repository": "https://github.com/lpio/lpio-client-js.git",
   "main": "./lib/Client.js",
@@ -24,7 +24,8 @@
     "all": "npm run lint && npm run build",
     "lint": "eslint ./src",
     "clean": "rm -fr ./lib/*",
-    "build": "npm run clean && babel src --out-dir lib"
+    "build": "npm run clean && babel src --out-dir lib",
+    "prepublish": "npm run all"
   },
   "license": "MIT"
 }
