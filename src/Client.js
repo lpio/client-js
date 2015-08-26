@@ -8,6 +8,7 @@ import request from './request'
 export default class Client {
   static DEFAULTS = {
     id: undefined,
+    user: undefined,
     url: '/lpio',
     multiplex: undefined,
     backoff: undefined,
@@ -90,7 +91,7 @@ export default class Client {
    *
    * @api private
    */
-  buildMessage(options) {
+  buildMessage(options) {
     return {
       id: String(uid()),
       type: 'data',
