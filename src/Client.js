@@ -4,6 +4,7 @@ import Multiplexer from 'lpio-multiplexer-js'
 import uid from 'get-uid'
 
 import request from './request'
+import ping from './ping'
 
 let noop = () => {}
 
@@ -28,6 +29,11 @@ export default class Client extends Emitter {
     ping(this, this.options.pingInterval)
   }
 
+  /**
+   * Connect the client.
+   *
+   * @api public
+   */
   connect() {
     if (this.connected || this.loading) return this
 
@@ -40,11 +46,19 @@ export default class Client extends Emitter {
     }
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
-    this.open()
+
+    // First thing to do is a ping request, because we can only safe for sure
+    // we are connected when we got a response.
+    this.send({type: 'ping'})
 
     return this
   }
 
+  /**
+   * Disconnect the client.
+   *
+   * @api public
+   */
   disconnect() {
     let {connected} = this
     this.disabled = true
@@ -54,6 +68,11 @@ export default class Client extends Emitter {
     if (connected) this.emit('disconnected')
   }
 
+  /**
+   * Send a message.
+   *
+   * @api public
+   */
   send(options, callback = noop) {
     if (options.type === 'user') {
       let err
@@ -71,22 +90,33 @@ export default class Client extends Emitter {
     }
 
     this.multiplexer.add(message)
-
-    if (callback) {
-      let timeoutId
-      let onAck = () => {
-        clearTimeout(timeoutId)
-        callback()
-      }
-      this.once(`ack:${message.id}`, onAck)
-      timeoutId = setTimeout(() => {
-        this.off(`ack:${message.id}`, onAck)
-        callback(new Error('Delivery timeout.'))
-      }, this.options.ackTimeout)
-    }
+    if (callback) this.subscribeAck(message, callback)
     return this
   }
 
+  /**
+   * Subscribes ack for message, implements a timeout.
+   *
+   * @api private
+   */
+  subscribeAck(message, callback) {
+    let timeoutId
+    let onAck = () => {
+      clearTimeout(timeoutId)
+      callback()
+    }
+    this.once(`ack:${message.id}`, onAck)
+    timeoutId = setTimeout(() => {
+      this.off(`ack:${message.id}`, onAck)
+      callback(new Error('Delivery timeout.'))
+    }, this.options.ackTimeout)
+  }
+
+  /**
+   * Opens request and sends messages.
+   *
+   * @api private
+   */
   open(messages = []) {
     if (this.disabled || this.loading) {
       // Never loose messages, even if right now this situation should
@@ -110,17 +140,32 @@ export default class Client extends Emitter {
     })
   }
 
+  /**
+   * Reopens request using backoff.
+   *
+   * @api private
+   */
   reopen(messages) {
     setTimeout(() => {
       this.open(messages)
     }, this.backoff.duration())
   }
 
+  /**
+   * Fired when request is closed.
+   *
+   * @api private
+   */
   onRequestClose() {
     this.request = undefined
     this.loading = false
   }
 
+  /**
+   * Fired when request was successfull.
+   *
+   * @api private
+   */
   onRequestSuccess(res) {
     this.backoff.reset()
     if (!this.connected) {
@@ -131,6 +176,11 @@ export default class Client extends Emitter {
     this.open()
   }
 
+  /**
+   * Fired when request failed.
+   *
+   * @api private
+   */
   onRequestError(messages, err) {
     this.emit('error', err)
     if (this.connected &&
@@ -141,6 +191,11 @@ export default class Client extends Emitter {
     this.reopen(messages)
   }
 
+  /**
+   * Fired on every new received message.
+   *
+   * @api private
+   */
   onMessage(message) {
     this.emit('message', message)
 
@@ -161,6 +216,11 @@ export default class Client extends Emitter {
     })
   }
 
+  /**
+   * Fired when multiplexer did a clean up.
+   *
+   * @api private
+   */
   onDrain(messages) {
     if (this.request) this.request.abort()
     this.open(messages)

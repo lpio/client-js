@@ -1,5 +1,5 @@
 /**
- * Creates an XHR request with all specific to lp settings.
+ * Creates an XHR request with all specific to LP settings.
  */
 export default function request(options) {
   let xhr
