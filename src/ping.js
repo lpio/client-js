@@ -3,18 +3,13 @@
  */
 export default function ping(client, interval) {
   let intervalId
-  let last = Date.now()
+
+  function ping() {
+    client.send({type: 'ping'})
+  }
 
   client.on('connected', () => {
-    intervalId = setInterval(() => {
-      if (Date.now() - last > interval) {
-        client.send({type: 'ping'})
-      }
-    }, interval)
-  })
-
-  client.on('message', () => {
-    last = Date.now()
+    intervalId = setInterval(ping, interval)
   })
 
   client.on('disconnected', () => {
