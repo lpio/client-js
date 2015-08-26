@@ -240,6 +240,6 @@ export default class Client {
    * @api private
    */
   onError(err) {
-    if (err) this.out.emit('err', err)
+    if (err) this.out.emit('error', err)
   }
 }
