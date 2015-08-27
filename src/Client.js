@@ -2,8 +2,11 @@ import Emitter from 'emitter-component'
 import Backoff from 'backo'
 import Multiplexer from 'lpio-multiplexer'
 import uid from 'get-uid'
+import debug from 'debug'
 
 import request from './request'
+
+let log = debug('lpio')
 
 export default class Client {
   static DEFAULTS = {
@@ -42,6 +45,7 @@ export default class Client {
       return this.out
     }
 
+    log('connecting')
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
     this.pingIntervalId = setInterval(::this.ping, this.options.pingInterval)
@@ -63,6 +67,7 @@ export default class Client {
     this.multiplexer.off('drain')
     if (this.request) this.request.abort()
     clearInterval(this.pingIntervalId)
+    log('disconnected')
     if (connected) this.out.emit('disconnected')
     return this
   }
@@ -81,6 +86,7 @@ export default class Client {
     }
 
     let message = this.buildMessage(options)
+    log('sending %s', message.type, message)
     this.multiplexer.add(message)
     if (callback) this.subscribeAck(message, callback)
     return this
@@ -109,11 +115,13 @@ export default class Client {
   subscribeAck(message, callback) {
     let timeoutId
     let onAck = () => {
+      log('delivered %s', message.type, message)
       clearTimeout(timeoutId)
       callback()
     }
     this.in.once(`ack:${message.id}`, onAck)
     timeoutId = setTimeout(() => {
+      log('message timeout', message)
       this.in.off(`ack:${message.id}`, onAck)
       callback(new Error('Delivery timeout.'))
     }, this.options.ackTimeout)
@@ -142,7 +150,6 @@ export default class Client {
     }
 
     this.loading = true
-
     this.request = request({
       url: this.options.url,
       data: {
@@ -165,6 +172,8 @@ export default class Client {
     if (this.reopening) return
     this.reopening = true
     let backoff = this.backoff.duration()
+
+    log('reopen in %sms', backoff)
 
     // We need to have at least one message to get a response fast to trigger
     // "reconnected" event faster.
@@ -216,6 +225,7 @@ export default class Client {
    * @api private
    */
   onRequestError(messages, err) {
+    log('request error', err)
     this.out.emit('error', err)
     this.reopen(messages)
   }
@@ -226,6 +236,7 @@ export default class Client {
    * @api private
    */
   onMessage(message) {
+    log('received %s', message.type, message)
     this.out.emit('message', message)
 
     if (message.type === 'ack') {
@@ -260,6 +271,9 @@ export default class Client {
    * @api private
    */
   onError(err) {
-    if (err) this.out.emit('error', err)
+    if (err) {
+      log('error', err)
+      this.out.emit('error', err)
+    }
   }
 }
