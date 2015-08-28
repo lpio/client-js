@@ -98,11 +98,18 @@ export default class Client {
    * @api private
    */
   buildMessage(options) {
+    let recipient
+
+    if (options.type === 'ping' || options.type === 'ack') {
+      recipient = 'server'
+    }
+
     return {
       id: String(uid()),
       type: 'data',
       client: this.options.id,
       sender: this.options.user,
+      recipient,
       ...options
     }
   }
