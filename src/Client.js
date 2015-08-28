@@ -38,8 +38,8 @@ export default class Client {
     if (this.connected || this.loading) return this.out
 
     let err
-    if (!this.options.id) err = new Error('Client id is undefined.')
-    if (!this.options.user) err = new Error('User is undefined.')
+    if (!this.options.id) err = new Error('Option "id" is undefined.')
+    if (!this.options.user) err = new Error('Option "user" is undefined.')
     if (err) {
       setTimeout(this.onError.bind(this, err))
       return this.out
