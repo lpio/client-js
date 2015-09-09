@@ -4,7 +4,8 @@ import Multiplexer from 'lpio-multiplexer'
 import debug from 'debug'
 
 import request from './request'
-import buildMessage from './buildMessage'
+import Message from './Message'
+import Package from './Package'
 
 let log = debug('lpio')
 
@@ -73,15 +74,15 @@ export default class Client {
    *
    * @api public
    */
-  send(msg, callback) {
-    if (msg.type === 'data') {
+  send(options, callback) {
+    if (options.type === 'data') {
       let err
-      if (!msg.data) err = new Error('Undefined property "data"')
-      if (!msg.recipient) err = new Error('Undefined property "recipient"')
+      if (!options.data) err = new Error('Undefined property "data"')
+      if (!options.recipient) err = new Error('Undefined property "recipient"')
       if (err) return setTimeout(callback.bind(null, err))
     }
 
-    let message = buildMessage(msg, this.options)
+    let message = new Message(options)
     log('sending %s', message.type, message)
     this.multiplexer.add(message)
     if (callback) this.subscribeAck(message, callback)
@@ -122,13 +123,10 @@ export default class Client {
     }
 
     this.loading = true
+
     this.request = request({
       url: this.options.url,
-      data: {
-        client: this.options.id,
-        user: this.options.user,
-        messages
-      },
+      data: new Package(messages, this.options),
       onSuccess: ::this.onRequestSuccess,
       onError: this.onRequestError.bind(this, messages),
       onClose: ::this.onRequestClose,
@@ -238,11 +236,10 @@ export default class Client {
     if (message.data) this.out.emit('data', message.data)
 
     // Lets schedule an confirmation.
-    let ack = buildMessage({
+    let ack = new Message({
       type: 'ack',
-      id: message.id,
-      recipient: 'server'
-    }, this.options)
+      id: message.id
+    })
     this.multiplexer.add(ack)
   }
 
