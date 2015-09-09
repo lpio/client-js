@@ -28,6 +28,7 @@ export default class Client {
     this.multiplexer = new Multiplexer(this.options.multiplex)
     this.out = new Emitter()
     this.in = new Emitter()
+    this.in.on('option', ::this.onOption)
   }
 
   /**
@@ -242,8 +243,14 @@ export default class Client {
       this.in.emit(`ack:${message.id}`, message)
       return
     }
+    // We have got an option.
+    else if (message.type === 'option') {
+      this.in.emit('option', {name: message.id, value: message.data})
+      return
+    }
 
-    if (message.data) this.out.emit('data', message.data)
+
+    if (message.type === 'data' && message.data) this.out.emit('data', message.data)
 
     // Lets schedule an confirmation.
     let ack = new Message({
@@ -251,6 +258,17 @@ export default class Client {
       id: message.id
     })
     this.multiplexer.add(ack)
+  }
+
+  /**
+   * We received an option.
+   *
+   * @api private
+   */
+  onOption({name, value}) {
+    if (name === 'client') {
+      this.options.id = value
+    }
   }
 
   /**

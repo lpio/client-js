@@ -13,9 +13,9 @@ export default class Message {
     this.data = options.data
   }
 
-  set(options) {
-    this.client = options.client
-    this.sender = options.sender
+  set({client, sender}) {
+    this.client = client
+    this.sender = sender
     return this
   }
 
