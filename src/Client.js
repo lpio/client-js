@@ -1,10 +1,10 @@
 import Emitter from 'emitter-component'
 import Backoff from 'backo'
 import Multiplexer from 'lpio-multiplexer'
-import uid from 'get-uid'
 import debug from 'debug'
 
 import request from './request'
+import buildMessage from './buildMessage'
 
 let log = debug('lpio')
 
@@ -73,41 +73,19 @@ export default class Client {
    *
    * @api public
    */
-  send(options, callback) {
-    if (options.type === 'data') {
+  send(msg, callback) {
+    if (msg.type === 'data') {
       let err
-      if (!options.data) err = new Error('Data is undefined.')
-      if (!options.recipient) err = new Error('Recipient is undefined.')
+      if (!msg.data) err = new Error('Undefined property "data"')
+      if (!msg.recipient) err = new Error('Undefined property "recipient"')
       if (err) return setTimeout(callback.bind(null, err))
     }
 
-    let message = this.buildMessage(options)
+    let message = buildMessage(msg, this.options)
     log('sending %s', message.type, message)
     this.multiplexer.add(message)
     if (callback) this.subscribeAck(message, callback)
     return this
-  }
-
-  /**
-   * Create a message.
-   *
-   * @api private
-   */
-  buildMessage(options) {
-    let recipient
-
-    if (options.type === 'ack') {
-      recipient = 'server'
-    }
-
-    return {
-      id: String(uid()),
-      type: 'data',
-      client: this.options.id,
-      sender: this.options.user,
-      recipient,
-      ...options
-    }
   }
 
   /**
@@ -260,11 +238,11 @@ export default class Client {
     if (message.data) this.out.emit('data', message.data)
 
     // Lets schedule an confirmation.
-    let ack = this.buildMessage({
+    let ack = buildMessage({
       type: 'ack',
       id: message.id,
       recipient: 'server'
-    })
+    }, this.options)
     this.multiplexer.add(ack)
   }
 
