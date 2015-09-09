@@ -59,13 +59,10 @@ export default class Client {
    * @api public
    */
   disconnect() {
-    let {connected} = this
     this.disabled = true
-    this.connected = false
     this.multiplexer.off('drain')
     if (this.request) this.request.close()
-    log('disconnected')
-    if (connected) this.out.emit('disconnected')
+    this.onDisconnected()
     return this
   }
 
@@ -165,7 +162,8 @@ export default class Client {
    * @api private
    */
   onDisconnected(backoff) {
-    if (!this.connected || backoff < this.backoff.max) return
+    if (!this.connected) return
+    if (backoff !== undefined && backoff < this.backoff.max) return
     this.connected = false
     log('disconnected')
     this.out.emit('disconnected')
@@ -216,7 +214,19 @@ export default class Client {
   onRequestError(messages, err) {
     log('request error', err)
     this.out.emit('error', err)
-    this.reopen(messages)
+
+    if (err.status === 401) this.onUnauthorized()
+    else this.reopen(messages)
+  }
+
+  /**
+   * Client is not authorized any more.
+   *
+   * @api private
+   */
+  onUnauthorized() {
+    this.out.emit('unauthorized')
+    this.disconnect()
   }
 
   /**

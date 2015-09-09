@@ -26,7 +26,11 @@ export default function request(options) {
     closed = true
     options.onClose()
     if (xhr.status === 200) options.onSuccess(JSON.parse(xhr.responseText))
-    else options.onError(new Error(xhr.responseText))
+    else {
+      let err = new Error(xhr.responseText)
+      err.status = xhr.status
+      options.onError(err)
+    }
   }
 
   xhr.onerror = err => {
