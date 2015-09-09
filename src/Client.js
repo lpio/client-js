@@ -16,7 +16,7 @@ export default class Client {
     multiplex: undefined,
     backoff: undefined,
     ackTimeout: 10000,
-    pingInterval: 25000
+    responseTimeout: 25000
   }
 
   constructor(options) {
@@ -48,10 +48,7 @@ export default class Client {
     log('connecting')
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
-    this.pingIntervalId = setInterval(::this.ping, this.options.pingInterval)
-    // First thing to do is a ping request, because we can only say for sure
-    // we are "connected" when we got a response.
-    this.ping()
+    this.open()
     return this.out
   }
 
@@ -65,8 +62,7 @@ export default class Client {
     this.disabled = true
     this.connected = false
     this.multiplexer.off('drain')
-    if (this.request) this.request.abort()
-    clearInterval(this.pingIntervalId)
+    if (this.request) this.request.close()
     log('disconnected')
     if (connected) this.out.emit('disconnected')
     return this
@@ -100,7 +96,7 @@ export default class Client {
   buildMessage(options) {
     let recipient
 
-    if (options.type === 'ping' || options.type === 'ack') {
+    if (options.type === 'ack') {
       recipient = 'server'
     }
 
@@ -135,15 +131,6 @@ export default class Client {
   }
 
   /**
-   * Schedule a ping message.
-   *
-   * @api private
-   */
-  ping() {
-    this.send({type: 'ping'})
-  }
-
-  /**
    * Opens a request and sends messages.
    *
    * @api private
@@ -164,9 +151,10 @@ export default class Client {
         user: this.options.user,
         messages
       },
-      success: ::this.onRequestSuccess,
-      error: this.onRequestError.bind(this, messages),
-      close: ::this.onRequestClose
+      onSuccess: ::this.onRequestSuccess,
+      onError: this.onRequestError.bind(this, messages),
+      onClose: ::this.onRequestClose,
+      timeout: this.options.responseTimeout
     })
   }
 
@@ -184,17 +172,38 @@ export default class Client {
 
     // We need to have at least one message to get a response fast to trigger
     // "reconnected" event faster.
-    if (!messages.length) messages.push(this.buildMessage({type: 'ping'}))
+    // XXX we need a new way to find out when we are reconnected quickly
+    // if (!messages.length) messages.push(this.buildMessage({type: 'ping'}))
 
     setTimeout(() => {
       this.reopening = false
       this.open(messages)
     }, backoff)
 
-    if (this.connected && backoff === this.backoff.max) {
-      this.connected = false
-      this.out.emit('disconnected')
-    }
+    this.onDisconnected(backoff)
+  }
+
+  /**
+   * Set connected to false and emit disconnected if we are disconnected.
+   *
+   * @api private
+   */
+  onDisconnected(backoff) {
+    if (!this.connected || backoff < this.backoff.max) return
+    this.connected = false
+    log('disconnected')
+    this.out.emit('disconnected')
+  }
+
+  /**
+   * Set connected to true and emit connected if we are connected.
+   *
+   * @api private
+   */
+  onConnected() {
+    if (this.connected) return
+    this.connected = true
+    this.out.emit('connected')
   }
 
   /**
@@ -213,11 +222,8 @@ export default class Client {
    * @api private
    */
   onRequestSuccess(res) {
+    this.onConnected()
     this.backoff.reset()
-    if (!this.connected) {
-      this.connected = true
-      this.out.emit('connected')
-    }
     res.messages.forEach(::this.onMessage)
 
     // In case we have got new messages while we where busy with sending previous.
@@ -268,7 +274,7 @@ export default class Client {
    * @api private
    */
   onDrain(messages) {
-    if (this.request) this.request.abort()
+    if (this.request) this.request.close()
     this.open(messages)
   }
 

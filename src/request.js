@@ -2,23 +2,38 @@
  * Creates an XHR request with all specific to LP settings.
  */
 export default function request(options) {
-  let xhr
   let closed = false
+  let xhr
 
   if (window.XMLHttpRequest) xhr = new window.XMLHttpRequest()
   else xhr = new window.ActiveXObject('Microsoft.XMLHTTP')
 
-  xhr.onreadystatechange = () => {
-    if (xhr.readyState !== 4 || closed) return
-    options.close()
-    if (xhr.status === 200) options.success(JSON.parse(xhr.responseText))
-    else options.error(new Error(xhr.responseText))
+  function close() {
+    closed = true
+    xhr.abort()
+    options.onClose()
   }
 
-  xhr.onerror = (err) => {
+  let timeoutId = setTimeout(() => {
     if (closed) return
+    close()
+    options.onError(new Error('Request timeout.'))
+  }, options.timeout)
+
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState !== 4 || closed) return
+    clearTimeout(timeoutId)
     closed = true
-    options.error(err)
+    options.onClose()
+    if (xhr.status === 200) options.onSuccess(JSON.parse(xhr.responseText))
+    else options.onError(new Error(xhr.responseText))
+  }
+
+  xhr.onerror = err => {
+    if (closed) return
+    clearTimeout(timeoutId)
+    closed = true
+    options.onError(err)
   }
 
   xhr.open('POST', options.url, true)
@@ -26,11 +41,5 @@ export default function request(options) {
   xhr.setRequestHeader('Accept', 'application/json')
   xhr.send(JSON.stringify(options.data))
 
-  return {
-    abort: () => {
-      closed = true
-      xhr.abort()
-      options.close()
-    }
-  }
+  return {close}
 }
