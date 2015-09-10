@@ -245,18 +245,20 @@ export default class Client {
     log('received %s', message.type, message)
     this.out.emit('message', message)
 
-    if (message.type === 'ack') {
-      this.in.emit(`ack:${message.id}`, message)
-      return
+    switch (message.type) {
+      case 'ack':
+        this.in.emit(`ack:${message.id}`, message)
+        // No need to send an ack in response to an ack.
+        return
+      // We have got an option, its an internal message.
+      case 'option':
+        this.in.emit('option', {name: message.id, value: message.data})
+        break
+      case 'data':
+        if (message.data) this.out.emit('data', message.data)
+        break
+      default:
     }
-    // We have got an option.
-    else if (message.type === 'option') {
-      this.in.emit('option', {name: message.id, value: message.data})
-      return
-    }
-
-
-    if (message.type === 'data' && message.data) this.out.emit('data', message.data)
 
     // Lets schedule an confirmation.
     let ack = new Message({
