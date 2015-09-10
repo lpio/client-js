@@ -126,7 +126,11 @@ export default class Client {
       url: this.options.url,
       data: new Package(messages, this.options),
       onSuccess: ::this.onRequestSuccess,
-      onError: this.onRequestError.bind(this, messages),
+      onError: err => {
+        // Put unsent messages back to multiplexer in order to not to loose them.
+        this.multiplexer.add(messages)
+        this.onRequestError(err)
+      },
       onClose: ::this.onRequestClose,
       timeout: this.options.responseTimeout
     })
@@ -137,7 +141,7 @@ export default class Client {
    *
    * @api private
    */
-  reopen(messages = []) {
+  reopen() {
     if (this.reopening) return
     this.reopening = true
     let backoff = this.backoff.duration()
@@ -151,7 +155,7 @@ export default class Client {
 
     setTimeout(() => {
       this.reopening = false
-      this.open(messages)
+      this.open()
     }, backoff)
 
     this.onDisconnected(backoff)
@@ -165,6 +169,9 @@ export default class Client {
   onDisconnected(backoff) {
     if (!this.connected) return
     if (backoff !== undefined && backoff < this.backoff.max) return
+    // We need to unset the id in order to receive an immediate response with new
+    // client id when reconnecting.
+    this.options.id = undefined
     this.connected = false
     log('disconnected')
     this.out.emit('disconnected')
@@ -212,12 +219,11 @@ export default class Client {
    *
    * @api private
    */
-  onRequestError(messages, err) {
+  onRequestError(err) {
     log('request error', err)
     this.out.emit('error', err)
-
     if (err.status === 401) this.onUnauthorized()
-    else this.reopen(messages)
+    else this.reopen()
   }
 
   /**
