@@ -16,7 +16,7 @@ export default class Client {
     url: '/lpio',
     multiplex: undefined,
     backoff: undefined,
-    ackTimeout: 10000,
+    ackTimeout: 5000,
     responseTimeout: 25000
   }
 
