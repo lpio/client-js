@@ -14,6 +14,7 @@ export default class Client {
     url: '/lpio',
     multiplex: undefined,
     backoff: undefined,
+    data: undefined,
     ackTimeout: 1000,
     responseTimeout: 25000
   }
@@ -65,6 +66,7 @@ export default class Client {
     if (options.type === 'data') {
       let err
       if (!options.data) err = new Error('Undefined property "data"')
+      if (!options.channel) err = new Error('Undefined property "channel"')
       if (err) return setTimeout(callback.bind(null, err))
     }
     let message = {
@@ -117,7 +119,7 @@ export default class Client {
     this.request = request({
       url: this.options.url,
       client: this.options.id,
-      data: {messages},
+      data: {...this.options.data, messages},
       onSuccess: ::this.onRequestSuccess,
       onError: err => {
         // Put unsent messages back to multiplexer in order to not to loose them.
