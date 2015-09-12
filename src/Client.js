@@ -25,6 +25,7 @@ export default class Client {
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
     this.multiplexer = new Multiplexer(this.options.multiplex)
+    this.multiplexer.on('drain', ::this.onDrain)
     this.out = new Emitter()
     this.in = new Emitter()
     this.in.on('option', ::this.onOption)
@@ -39,7 +40,7 @@ export default class Client {
     if (this.connected || this.loading) return this.out
     log('connecting')
     this.disabled = false
-    this.multiplexer.on('drain', ::this.onDrain)
+    this.multiplexer.start()
     this.open()
     return this.out
   }
@@ -51,7 +52,6 @@ export default class Client {
    */
   disconnect() {
     this.disabled = true
-    this.multiplexer.off('drain')
     if (this.request) this.request.close()
     this.onDisconnected()
     return this
@@ -162,6 +162,7 @@ export default class Client {
    * @api private
    */
   onDisconnected(backoff) {
+    this.multiplexer.stop()
     if (!this.connected) return
     if (backoff !== undefined && backoff < this.backoff.max) return
     // We need to unset the id in order to receive an immediate response with new
