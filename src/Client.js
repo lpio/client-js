@@ -2,21 +2,19 @@ import Emitter from 'emitter-component'
 import Backoff from 'backo'
 import Multiplexer from 'lpio-multiplexer'
 import debug from 'debug'
+import uid from 'get-uid'
 
 import request from './request'
-import Message from './Message'
-import Package from './Package'
 
 let log = debug('lpio')
 
 export default class Client {
   static DEFAULTS = {
     id: undefined,
-    user: undefined,
     url: '/lpio',
     multiplex: undefined,
     backoff: undefined,
-    ackTimeout: 5000,
+    ackTimeout: 1000,
     responseTimeout: 25000
   }
 
@@ -38,14 +36,6 @@ export default class Client {
    */
   connect() {
     if (this.connected || this.loading) return this.out
-
-    let err
-    if (!this.options.user) err = new Error('Option "user" is undefined.')
-    if (err) {
-      setTimeout(this.onError.bind(this, err))
-      return this.out
-    }
-
     log('connecting')
     this.disabled = false
     this.multiplexer.on('drain', ::this.onDrain)
@@ -75,11 +65,14 @@ export default class Client {
     if (options.type === 'data') {
       let err
       if (!options.data) err = new Error('Undefined property "data"')
-      if (!options.recipient) err = new Error('Undefined property "recipient"')
       if (err) return setTimeout(callback.bind(null, err))
     }
-
-    let message = new Message(options)
+    let message = {
+      id: String(uid()),
+      type: 'data',
+      data: options.data,
+      channel: options.channel
+    }
     log('sending %s', message.type, message)
     this.multiplexer.add(message)
     if (callback) this.subscribeAck(message, callback)
@@ -123,7 +116,8 @@ export default class Client {
 
     this.request = request({
       url: this.options.url,
-      data: new Package(messages, this.options),
+      client: this.options.id,
+      data: {messages},
       onSuccess: ::this.onRequestSuccess,
       onError: err => {
         // Put unsent messages back to multiplexer in order to not to loose them.
@@ -260,11 +254,10 @@ export default class Client {
     }
 
     // Lets schedule an confirmation.
-    let ack = new Message({
+    this.multiplexer.add({
       type: 'ack',
       id: message.id
     })
-    this.multiplexer.add(ack)
   }
 
   /**
@@ -286,17 +279,5 @@ export default class Client {
   onDrain(messages) {
     if (this.request) this.request.close()
     this.open(messages)
-  }
-
-  /**
-   * Emits error on out channel.
-   *
-   * @api private
-   */
-  onError(err) {
-    if (err) {
-      log('error', err)
-      this.out.emit('error', err)
-    }
   }
 }

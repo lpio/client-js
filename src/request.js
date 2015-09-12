@@ -43,6 +43,7 @@ export default function request(options) {
   xhr.open('POST', options.url, true)
   xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
   xhr.setRequestHeader('Accept', 'application/json')
+  xhr.setRequestHeader('LPIO-Client', options.client)
   xhr.send(JSON.stringify(options.data))
 
   return {close}
