@@ -66,7 +66,6 @@ export default class Client {
     if (options.type === 'data') {
       let err
       if (!options.data) err = new Error('Undefined property "data"')
-      if (!options.channel) err = new Error('Undefined property "channel"')
       if (err) return setTimeout(callback.bind(null, err))
     }
     let message = {

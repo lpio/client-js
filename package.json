@@ -1,6 +1,6 @@
 {
   "name": "lpio-client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Http long polling client.",
   "repository": "https://github.com/lpio/lpio-client-js.git",
   "main": "./lib/Client.js",
