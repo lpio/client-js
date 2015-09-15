@@ -178,7 +178,7 @@ export default class Client {
    * @api private
    */
   onConnected() {
-    if (this.connected) return
+    if (this.connected || !this.options.id) return
     this.connected = true
     this.out.emit('connected')
   }
@@ -199,9 +199,9 @@ export default class Client {
    * @api private
    */
   onRequestSuccess(res) {
-    this.onConnected()
     this.backoff.reset()
     res.messages.forEach(::this.onMessage)
+    this.onConnected()
 
     // In case we have got new messages while we where busy with sending previous.
     let messages = this.multiplexer.get()
