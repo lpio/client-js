@@ -200,18 +200,12 @@ export default class Client {
    */
   onRequestSuccess(res) {
     this.backoff.reset()
-      // We have got an option, its an internal message.
-      case 'set':
-        this.in.emit('option', {name: message.id, value: message.data})
-        break
-
     if (res.set) {
       if (res.set.id) {
         this.id = res.set.id
         this.out.emit('set:id', this.id)
       }
     }
-
     res.messages.forEach(::this.onMessage)
     this.onConnected()
 
