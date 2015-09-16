@@ -21,6 +21,7 @@ export default class Client {
 
   constructor(options) {
     this.options = { ...Client.DEFAULTS, ...options}
+    this.id = this.options.id
     this.connected = false
     this.disabled = true
     this.backoff = new Backoff(this.options.backoff)
@@ -28,7 +29,6 @@ export default class Client {
     this.multiplexer.on('drain', ::this.onDrain)
     this.out = new Emitter()
     this.in = new Emitter()
-    this.in.on('option', ::this.onOption)
   }
 
   /**
@@ -117,7 +117,7 @@ export default class Client {
 
     this.request = request({
       url: this.options.url,
-      client: this.options.id,
+      client: this.id,
       data: {...this.options.data, messages},
       onSuccess: ::this.onRequestSuccess,
       onError: err => {
@@ -166,7 +166,7 @@ export default class Client {
     if (backoff !== undefined && backoff < this.backoff.max) return
     // We need to unset the id in order to receive an immediate response with new
     // client id when reconnecting.
-    this.options.id = undefined
+    this.id = undefined
     this.connected = false
     log('disconnected')
     this.out.emit('disconnected')
@@ -178,7 +178,7 @@ export default class Client {
    * @api private
    */
   onConnected() {
-    if (this.connected || !this.options.id) return
+    if (this.connected || !this.id) return
     this.connected = true
     this.out.emit('connected')
   }
@@ -200,6 +200,18 @@ export default class Client {
    */
   onRequestSuccess(res) {
     this.backoff.reset()
+      // We have got an option, its an internal message.
+      case 'set':
+        this.in.emit('option', {name: message.id, value: message.data})
+        break
+
+    if (res.set) {
+      if (res.set.id) {
+        this.id = res.set.id
+        this.out.emit('set:id', this.id)
+      }
+    }
+
     res.messages.forEach(::this.onMessage)
     this.onConnected()
 
@@ -245,10 +257,6 @@ export default class Client {
         this.in.emit(`ack:${message.id}`, message)
         // No need to send an ack in response to an ack.
         return
-      // We have got an option, its an internal message.
-      case 'option':
-        this.in.emit('option', {name: message.id, value: message.data})
-        break
       case 'data':
         if (message.data) this.out.emit('data', message.data)
         break
@@ -260,17 +268,6 @@ export default class Client {
       type: 'ack',
       id: message.id
     })
-  }
-
-  /**
-   * We received an option.
-   *
-   * @api private
-   */
-  onOption({name, value}) {
-    if (name === 'client') {
-      this.options.id = value
-    }
   }
 
   /**
