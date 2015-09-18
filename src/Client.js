@@ -180,6 +180,7 @@ export default class Client {
   onConnected() {
     if (this.connected || !this.id) return
     this.connected = true
+    log('connected')
     this.out.emit('connected')
   }
 
