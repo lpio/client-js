@@ -40,7 +40,6 @@ export default class Client {
     if (this.connected || this.loading) return this.out
     log('connecting')
     this.disabled = false
-    this.multiplexer.start()
     this.open()
     return this.out
   }
@@ -76,7 +75,14 @@ export default class Client {
     }
     log('sending %s', message.type, message)
     this.multiplexer.add(message)
-    if (callback) this.subscribeAck(message, callback)
+    if (callback) {
+      // In this case we are not gonna get an ack at time, lets wait until
+      // we are in a different state and then subscribe an ack.
+      if (!this.connected || this.reopening) {
+        this.out.once('success', () => this.subscribeAck(message, callback))
+      }
+      else this.subscribeAck(message, callback)
+    }
     return this
   }
 
@@ -137,22 +143,16 @@ export default class Client {
    */
   reopen() {
     if (this.reopening) return
-    this.reopening = true
     let backoff = this.backoff.duration()
-
+    this.reopening = true
+    this.multiplexer.stop()
+    if (backoff >= this.backoff.max) this.onDisconnected()
     log('reopen in %sms', backoff)
-
-    // We need to have at least one message to get a response fast to trigger
-    // "reconnected" event faster.
-    // XXX we need a new way to find out when we are reconnected quickly
-    // if (!messages.length) messages.push(this.buildMessage({type: 'ping'}))
-
     setTimeout(() => {
       this.reopening = false
+      log('reopening')
       this.open()
     }, backoff)
-
-    this.onDisconnected(backoff)
   }
 
   /**
@@ -160,10 +160,9 @@ export default class Client {
    *
    * @api private
    */
-  onDisconnected(backoff) {
-    this.multiplexer.stop()
+  onDisconnected() {
     if (!this.connected) return
-    if (backoff !== undefined && backoff < this.backoff.max) return
+    this.multiplexer.stop()
     // We need to unset the id in order to receive an immediate response with new
     // client id when reconnecting.
     this.id = undefined
@@ -200,6 +199,7 @@ export default class Client {
    * @api private
    */
   onRequestSuccess(res) {
+    this.out.emit('success', res)
     this.backoff.reset()
     if (res.set) {
       if (res.set.id) {
@@ -213,6 +213,8 @@ export default class Client {
     // In case we have got new messages while we where busy with sending previous.
     let messages = this.multiplexer.get()
     this.multiplexer.reset()
+    // It won't do anything if already started.
+    this.multiplexer.start()
     this.open(messages)
   }
 
