@@ -207,7 +207,6 @@ export default class Client {
         this.out.emit('set:id', this.id)
       }
     }
-    res.messages.forEach(::this.onMessage)
     this.onConnected()
 
     // In case we have got new messages while we where busy with sending previous.
@@ -216,6 +215,10 @@ export default class Client {
     // It won't do anything if already started.
     this.multiplexer.start()
     this.open(messages)
+
+    // Always at the end. Emitter calls handlers in sync and without catching
+    // errors so a user handler might throw and cause an exit out of this function.
+    res.messages.forEach(::this.onMessage)
   }
 
   /**
