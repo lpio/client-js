@@ -156,6 +156,22 @@ export default class Client {
   }
 
   /**
+   * Emit to the output channel with error handling.
+   * We don't want any errors in our code have effect on the reconnection logic.
+   * Events are sync and errors are not catched when emitter calls listeners.
+   *
+   * @api private
+   */
+  emit() {
+    try {
+      this.out.emit.apply(this.out, arguments)
+    }
+    catch (err) {
+      this.out.emit('error', err)
+    }
+  }
+
+  /**
    * Set connected to false and emit disconnected if we are disconnected.
    *
    * @api private
@@ -168,7 +184,7 @@ export default class Client {
     this.id = undefined
     this.connected = false
     log('disconnected')
-    this.out.emit('disconnected')
+    this.emit('disconnected')
   }
 
   /**
@@ -180,7 +196,7 @@ export default class Client {
     if (this.connected || !this.id) return
     this.connected = true
     log('connected')
-    this.out.emit('connected')
+    this.emit('connected')
   }
 
   /**
@@ -199,26 +215,34 @@ export default class Client {
    * @api private
    */
   onRequestSuccess(res) {
-    this.out.emit('success', res)
+    this.emit('success', res)
     this.backoff.reset()
+
+    // This should happen before 'set:id' event becasuse user code needs to
+    // rely on the order and handle new client id reception potentially by
+    // rerequesting the whole messages history (if there is one).
+    this.onConnected()
+
     if (res.set) {
       if (res.set.id) {
         this.id = res.set.id
-        this.out.emit('set:id', this.id)
+        this.emit('set:id', this.id)
       }
     }
-    this.onConnected()
 
-    // In case we have got new messages while we where busy with sending previous.
+    // Always at the end. Emitter calls handlers in sync and without catching
+    // errors so a user handler might throw and cause an exit out of this function.
+    // Messages handling needs to be done here, before we reopen request in order
+    // to get the acks and send them with the same request.
+    res.messages.forEach(::this.onMessage)
+
+    // Get the acks right away.
+    // Also in case we have got new messages while we where busy with sending previous.
     let messages = this.multiplexer.get()
     this.multiplexer.reset()
     // It won't do anything if already started.
     this.multiplexer.start()
     this.open(messages)
-
-    // Always at the end. Emitter calls handlers in sync and without catching
-    // errors so a user handler might throw and cause an exit out of this function.
-    res.messages.forEach(::this.onMessage)
   }
 
   /**
@@ -228,7 +252,7 @@ export default class Client {
    */
   onRequestError(err) {
     log('request error', err)
-    this.out.emit('error', err)
+    this.emit('error', err)
     if (err.status === 401) this.onUnauthorized()
     else this.reopen()
   }
@@ -239,7 +263,7 @@ export default class Client {
    * @api private
    */
   onUnauthorized() {
-    this.out.emit('unauthorized')
+    this.emit('unauthorized')
     this.disconnect()
   }
 
@@ -250,7 +274,7 @@ export default class Client {
    */
   onMessage(message) {
     log('received %s', message.type, message)
-    this.out.emit('message', message)
+    this.emit('message', message)
 
     switch (message.type) {
       case 'ack':
@@ -258,7 +282,7 @@ export default class Client {
         // No need to send an ack in response to an ack.
         return
       case 'data':
-        if (message.data) this.out.emit('data', message.data)
+        if (message.data) this.emit('data', message.data)
         break
       default:
     }
