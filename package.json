@@ -12,21 +12,33 @@
     "lpio-multiplexer": "^0.1.0"
   },
   "devDependencies": {
+    "babel": "^5.6.14",
+    "babel-core": "^5.6.20",
+    "babel-eslint": "^3.1.23",
+    "babel-loader": "^5.3.1",
     "eslint": "^0.24.1",
     "eslint-config-airbnb": "^0.0.6",
     "eslint-config-ubergrape": "^0.1.1",
     "eslint-plugin-react": "^2.7.0",
-    "babel": "^5.6.14",
-    "babel-core": "^5.6.20",
-    "babel-eslint": "^3.1.23",
-    "babel-loader": "^5.3.1"
+    "expect.js": "^0.3.1",
+    "json-loader": "^0.5.1",
+    "karma": "^0.13.8",
+    "karma-chrome-launcher": "^0.1.10",
+    "karma-cli": "^0.0.4",
+    "karma-mocha": "^0.1.10",
+    "karma-sourcemap-loader": "^0.3.5",
+    "karma-webpack": "^1.5.1",
+    "lodash": "^3.10.1",
+    "mocha": "^2.2.5"
   },
   "scripts": {
     "all": "npm run lint && npm run build",
     "lint": "eslint ./src",
     "clean": "rm -fr ./lib/*",
     "build": "npm run clean && babel src --out-dir lib",
-    "prepublish": "npm run all"
+    "prepublish": "npm run all",
+    "test": "karma start",
+    "test-watch": "NODE_ENV=test karma start"
   },
   "license": "MIT"
 }

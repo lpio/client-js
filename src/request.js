@@ -17,7 +17,9 @@ export default function request(options) {
   let timeoutId = setTimeout(() => {
     if (closed) return
     close()
-    options.onError(new Error('Response timeout.'))
+    let err = new Error('Response timeout.')
+    err.status = 408
+    options.onError(err)
   }, options.timeout)
 
   xhr.onreadystatechange = () => {
