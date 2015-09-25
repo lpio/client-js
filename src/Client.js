@@ -61,18 +61,23 @@ export default class Client {
    *
    * @api public
    */
-  send(options, callback) {
+  send(options = {}, callback) {
+    if (!options.type) options.type = 'data'
+
     if (options.type === 'data') {
       let err
       if (!options.data) err = new Error('Undefined property "data"')
-      if (err) return setTimeout(callback.bind(null, err))
+      if (err) {
+        if (callback) setTimeout(callback.bind(null, err))
+        return this
+      }
     }
+
     let message = {
       id: String(uid()),
-      type: 'data',
-      data: options.data,
-      channel: options.channel
+      ...options
     }
+
     log('sending %s', message.type, message)
     this.multiplexer.add(message)
     if (callback) {
@@ -218,17 +223,20 @@ export default class Client {
     this.emit('success', res)
     this.backoff.reset()
 
-    // This should happen before 'set:id' event becasuse user code needs to
-    // rely on the order and handle new client id reception potentially by
-    // rerequesting the whole messages history (if there is one).
-    this.onConnected()
-
     if (res.set) {
       if (res.set.id) {
         this.id = res.set.id
+        // This should happen before 'set:id' event becasuse user code needs to
+        // rely on the order and handle new client id reception potentially by
+        // rerequesting the whole messages history (if there is one).
+        this.onConnected()
         this.emit('set:id', this.id)
       }
     }
+
+    // Its possible that it hasn't been called above, because no client id has
+    // been set.
+    this.onConnected()
 
     // Always at the end. Emitter calls handlers in sync and without catching
     // errors so a user handler might throw and cause an exit out of this function.
