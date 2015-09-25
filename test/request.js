@@ -3,15 +3,16 @@ import request from '../src/request'
 import noop from 'lodash/utility/noop'
 
 describe('request()', () => {
-  describe('should return proper object', () => {
+  it('should return proper object', () => {
     let req = request({onClose: noop, onError: noop, timeout: 100})
     expect(req).to.be.an(Object)
     expect(req.close).to.be.a(Function)
   })
 
-  it('should call close and error callbacks', (done) => {
+  it('should call close and error callbacks', done => {
     let closed
     request({
+      url: '/something',
       onClose: () => {
         closed = true
       },
@@ -22,11 +23,11 @@ describe('request()', () => {
         expect(err.status).to.be(404)
         done()
       },
-      timeout: 100
+      timeout: 1500
     })
   })
 
-  it('should issue a timeout', (done) => {
+  it('should issue a timeout', done => {
     let closed
     request({
       onClose: () => {
@@ -38,12 +39,11 @@ describe('request()', () => {
         expect(err.message).to.be('Response timeout.')
         expect(err.status).to.be(408)
         done()
-      },
-      timeout: 1
+      }
     })
   })
 
-  it('should call onClose when .close()', (done) => {
+  it('should call onClose when .close()', () => {
     let closed
     request({
       onClose: () => {
@@ -52,5 +52,22 @@ describe('request()', () => {
       timeout: 100
     }).close()
     expect(closed).to.be(true)
+  })
+
+  it('should call succes callback', done => {
+    let closed
+    request({
+      url: 'http://localhost:3000/lpio',
+      onError: err => console.log(err.message),
+      onClose: () => {
+        closed = true
+      },
+      onSuccess: (res) => {
+        expect(res).to.be.an(Object)
+        done()
+      },
+      timeout: 1000,
+      data: {messages: []}
+    })
   })
 })
